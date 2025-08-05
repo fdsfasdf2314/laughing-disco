@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Offline SWF Player</title>
+  <meta charset="UTF-8" />
+  <title>Offline SWF Player with Start Button</title>
   <style>
     body {
       font-family: sans-serif;
@@ -30,28 +30,40 @@
     input[type="file"] {
       margin-top: 1em;
     }
+    button {
+      margin-top: 1em;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
   </style>
-  <script src="ruffle.js"></script> <!-- Make sure ruffle.js and ruffle.wasm are next to this file -->
+  <script src="ruffle.js"></script>
 </head>
 <body>
 
   <h1>💾 Offline SWF Player with Save Support</h1>
 
   <div id="dropzone">📂 Drop a .swf file here or click below</div>
-  <input type="file" id="file-input" accept=".swf">
+  <input type="file" id="file-input" accept=".swf" />
+  <br />
+  <button id="start-button" disabled>Start</button>
 
   <div id="player-container"></div>
 
   <script>
     const ruffle = window.RufflePlayer.newest();
     const container = document.getElementById("player-container");
+    let swfFile = null;
 
     function loadSWF(file) {
       if (!file.name.endsWith(".swf")) {
         alert("Only .swf files are supported.");
         return;
       }
-
       const reader = new FileReader();
       reader.onload = function () {
         const player = ruffle.createPlayer();
@@ -62,10 +74,20 @@
       reader.readAsArrayBuffer(file);
     }
 
-    // File input
+    // When file selected or dropped, store it and enable Start
+    function handleFile(file) {
+      if (!file.name.endsWith(".swf")) {
+        alert("Only .swf files are supported.");
+        return;
+      }
+      swfFile = file;
+      document.getElementById("start-button").disabled = false;
+    }
+
+    // File input change
     document.getElementById("file-input").addEventListener("change", e => {
       if (e.target.files.length > 0) {
-        loadSWF(e.target.files[0]);
+        handleFile(e.target.files[0]);
       }
     });
 
@@ -82,11 +104,19 @@
       e.preventDefault();
       dropzone.style.borderColor = "#888";
       if (e.dataTransfer.files.length > 0) {
-        loadSWF(e.dataTransfer.files[0]);
+        handleFile(e.dataTransfer.files[0]);
       }
     });
     dropzone.addEventListener("click", () => {
       document.getElementById("file-input").click();
+    });
+
+    // Start button click
+    document.getElementById("start-button").addEventListener("click", () => {
+      if (swfFile) {
+        loadSWF(swfFile);
+        document.getElementById("start-button").disabled = true;
+      }
     });
   </script>
 
