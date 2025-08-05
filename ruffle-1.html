@@ -1,136 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Offline SWF Player with Start Button</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      background: #1a1a1a;
-      color: white;
-      margin: 0;
-      padding: 2em;
-    }
-    #dropzone {
-      border: 2px dashed #888;
-      padding: 40px;
-      margin: 20px auto;
-      width: 80%;
-      border-radius: 10px;
-      cursor: pointer;
-      background: #2a2a2a;
-    }
-    ruffle-player {
-      width: 100%;
-      height: 600px;
-      display: block;
-      margin: 20px auto;
-    }
-    #start-btn {
-      margin: 1em auto;
-      padding: 0.8em 2em;
-      font-size: 1.1em;
-      background: #0a74da;
-      border: none;
-      border-radius: 6px;
-      color: white;
-      cursor: pointer;
-      display: none;
-    }
-    #start-btn:hover {
-      background: #095ab4;
-    }
-  </style>
-  <script src="ruffle.js"></script>
+<meta charset="UTF-8" />
+<title>SWF Player - New Tab Injection</title>
+<style>
+  body {
+    background: #222;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding: 40px;
+  }
+  #dropzone {
+    border: 3px dashed #666;
+    padding: 60px;
+    margin: 20px auto;
+    width: 90%;
+    max-width: 600px;
+    cursor: pointer;
+    font-size: 1.3em;
+    border-radius: 12px;
+    user-select: none;
+    transition: border-color 0.3s;
+  }
+  #dropzone.dragover {
+    border-color: #0f0;
+  }
+  button#start-button {
+    margin-top: 40px;
+    font-size: 2em;
+    padding: 15px 30px;
+    cursor: pointer;
+  }
+  button#start-button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+</style>
 </head>
 <body>
 
-  <h1>💾 Offline SWF Player with Save Support</h1>
+<h1>💾 Offline SWF Player in New Tab</h1>
 
-  <div id="dropzone">📂 Drop a .swf file here or click below</div>
-  <input type="file" id="file-input" accept=".swf" />
+<div id="dropzone">📂 Drop a .swf file here or click to select</div>
+<input type="file" id="file-input" accept=".swf" style="display:none" />
+<br />
+<button id="start-button" disabled>Start (Open in New Tab)</button>
 
-  <div id="player-container"></div>
-  <button id="start-btn">Start / Restart</button>
+<script>
+  const dropzone = document.getElementById("dropzone");
+  const fileInput = document.getElementById("file-input");
+  const startButton = document.getElementById("start-button");
+  let swfFile = null;
 
-  <script>
-    const ruffle = window.RufflePlayer.newest();
-    const container = document.getElementById("player-container");
-    const startBtn = document.getElementById("start-btn");
-    let player = null;
-    let loadedData = null;
-
-    function loadSWF(file) {
-      if (!file.name.endsWith(".swf")) {
-        alert("Only .swf files are supported.");
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = function () {
-        loadedData = reader.result;
-        if (player) {
-          player.remove();
-          player = null;
-        }
-        player = ruffle.createPlayer();
-        container.innerHTML = "";
-        container.appendChild(player);
-        player.load({ data: loadedData });
-        startBtn.style.display = "inline-block";
-
-        // Auto-start if possible
-        try {
-          player.play();
-        } catch (e) {
-          // Some SWFs may not support play() — fallback to manual start
-          console.log("Auto play not supported:", e);
-        }
-      };
-      reader.readAsArrayBuffer(file);
+  function handleFile(file) {
+    if (!file.name.endsWith(".swf")) {
+      alert("Only .swf files are supported.");
+      return;
     }
+    swfFile = file;
+    startButton.disabled = false;
+  }
 
-    startBtn.addEventListener("click", () => {
-      if (player && loadedData) {
-        player.remove();
-        player = ruffle.createPlayer();
-        container.innerHTML = "";
-        container.appendChild(player);
-        player.load({ data: loadedData });
-        try {
-          player.play();
-        } catch (e) {
-          console.log("Manual play failed:", e);
-        }
-      }
-    });
+  fileInput.addEventListener("change", e => {
+    if (e.target.files.length > 0) {
+      handleFile(e.target.files[0]);
+    }
+  });
 
-    document.getElementById("file-input").addEventListener("change", e => {
-      if (e.target.files.length > 0) {
-        loadSWF(e.target.files[0]);
-      }
-    });
+  dropzone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropzone.classList.add("dragover");
+  });
 
-    const dropzone = document.getElementById("dropzone");
-    dropzone.addEventListener("dragover", e => {
-      e.preventDefault();
-      dropzone.style.borderColor = "#0f0";
-    });
-    dropzone.addEventListener("dragleave", () => {
-      dropzone.style.borderColor = "#888";
-    });
-    dropzone.addEventListener("drop", e => {
-      e.preventDefault();
-      dropzone.style.borderColor = "#888";
-      if (e.dataTransfer.files.length > 0) {
-        loadSWF(e.dataTransfer.files[0]);
+  dropzone.addEventListener("dragleave", () => {
+    dropzone.classList.remove("dragover");
+  });
+
+  dropzone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    if (e.dataTransfer.files.length > 0) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  dropzone.addEventListener("click", () => {
+    fileInput.click();
+  });
+
+  startButton.addEventListener("click", () => {
+    if (!swfFile) return;
+
+    const reader = new FileReader();
+    reader.onload = function () {
+      // Convert ArrayBuffer to Base64
+      const arrayBuffer = reader.result;
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < uint8Array.byteLength; i++) {
+        binary += String.fromCharCode(uint8Array[i]);
       }
-    });
-    dropzone.addEventListener("click", () => {
-      document.getElementById("file-input").click();
-    });
-  </script>
+      const base64data = btoa(binary);
+
+      // Open new tab about:blank
+      const newTab = window.open("about:blank", "_blank");
+
+      // Inject HTML + Ruffle player + SWF
+      const html = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <title>SWF Player</title>
+          <style>
+            body {
+              margin: 0; background: black; display: flex; justify-content: center; align-items: center; height: 100vh;
+            }
+            ruffle-player {
+              width: 100vw; height: 100vh;
+            }
+          </style>
+        </head>
+        <body>
+          <ruffle-player id="player"></ruffle-player>
+          <script src="ruffle.js"></script>
+          <script>
+            window.addEventListener('load', () => {
+              const ruffle = window.RufflePlayer.newest();
+              const player = ruffle.createPlayer();
+              document.body.appendChild(player);
+              const base64data = "${base64data}";
+              const binaryString = atob(base64data);
+              const len = binaryString.length;
+              const bytes = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              player.load({ data: bytes.buffer });
+            });
+          </script>
+        </body>
+        </html>
+      `;
+
+      newTab.document.write(html);
+      newTab.document.close();
+
+      startButton.disabled = true;
+    };
+
+    reader.readAsArrayBuffer(swfFile);
+  });
+</script>
 
 </body>
 </html>
