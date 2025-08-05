@@ -27,18 +27,19 @@
       display: block;
       margin: 20px auto;
     }
-    input[type="file"] {
-      margin-top: 1em;
-    }
-    button {
-      margin-top: 1em;
-      padding: 10px 20px;
-      font-size: 1rem;
+    #start-btn {
+      margin: 1em auto;
+      padding: 0.8em 2em;
+      font-size: 1.1em;
+      background: #0a74da;
+      border: none;
+      border-radius: 6px;
+      color: white;
       cursor: pointer;
+      display: none;
     }
-    button:disabled {
-      opacity: 0.5;
-      cursor: default;
+    #start-btn:hover {
+      background: #095ab4;
     }
   </style>
   <script src="ruffle.js"></script>
@@ -49,49 +50,68 @@
 
   <div id="dropzone">📂 Drop a .swf file here or click below</div>
   <input type="file" id="file-input" accept=".swf" />
-  <br />
-  <button id="start-button" disabled>Start</button>
 
   <div id="player-container"></div>
+  <button id="start-btn">Start / Restart</button>
 
   <script>
     const ruffle = window.RufflePlayer.newest();
     const container = document.getElementById("player-container");
-    let swfFile = null;
+    const startBtn = document.getElementById("start-btn");
+    let player = null;
+    let loadedData = null;
 
     function loadSWF(file) {
       if (!file.name.endsWith(".swf")) {
         alert("Only .swf files are supported.");
         return;
       }
+
       const reader = new FileReader();
       reader.onload = function () {
-        const player = ruffle.createPlayer();
-        container.innerHTML = ""; // Clear previous
+        loadedData = reader.result;
+        if (player) {
+          player.remove();
+          player = null;
+        }
+        player = ruffle.createPlayer();
+        container.innerHTML = "";
         container.appendChild(player);
-        player.load({ data: reader.result });
+        player.load({ data: loadedData });
+        startBtn.style.display = "inline-block";
+
+        // Auto-start if possible
+        try {
+          player.play();
+        } catch (e) {
+          // Some SWFs may not support play() — fallback to manual start
+          console.log("Auto play not supported:", e);
+        }
       };
       reader.readAsArrayBuffer(file);
     }
 
-    // When file selected or dropped, store it and enable Start
-    function handleFile(file) {
-      if (!file.name.endsWith(".swf")) {
-        alert("Only .swf files are supported.");
-        return;
-      }
-      swfFile = file;
-      document.getElementById("start-button").disabled = false;
-    }
-
-    // File input change
-    document.getElementById("file-input").addEventListener("change", e => {
-      if (e.target.files.length > 0) {
-        handleFile(e.target.files[0]);
+    startBtn.addEventListener("click", () => {
+      if (player && loadedData) {
+        player.remove();
+        player = ruffle.createPlayer();
+        container.innerHTML = "";
+        container.appendChild(player);
+        player.load({ data: loadedData });
+        try {
+          player.play();
+        } catch (e) {
+          console.log("Manual play failed:", e);
+        }
       }
     });
 
-    // Drag and drop
+    document.getElementById("file-input").addEventListener("change", e => {
+      if (e.target.files.length > 0) {
+        loadSWF(e.target.files[0]);
+      }
+    });
+
     const dropzone = document.getElementById("dropzone");
     dropzone.addEventListener("dragover", e => {
       e.preventDefault();
@@ -104,19 +124,11 @@
       e.preventDefault();
       dropzone.style.borderColor = "#888";
       if (e.dataTransfer.files.length > 0) {
-        handleFile(e.dataTransfer.files[0]);
+        loadSWF(e.dataTransfer.files[0]);
       }
     });
     dropzone.addEventListener("click", () => {
       document.getElementById("file-input").click();
-    });
-
-    // Start button click
-    document.getElementById("start-button").addEventListener("click", () => {
-      if (swfFile) {
-        loadSWF(swfFile);
-        document.getElementById("start-button").disabled = true;
-      }
     });
   </script>
 
