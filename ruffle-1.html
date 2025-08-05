@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>SWF Player - New Tab Injection</title>
+<title>Offline SWF Player</title>
 <style>
-  body {
-    background: #222;
-    color: white;
-    font-family: Arial, sans-serif;
+  body, html {
+    margin: 0; padding: 0; height: 100%; background: #222; color: white; font-family: Arial, sans-serif;
+    overflow: hidden;
+  }
+  #upload-ui {
     text-align: center;
     padding: 40px;
   }
@@ -36,21 +37,42 @@
     opacity: 0.5;
     cursor: default;
   }
+
+  #player-container {
+    display: none;
+    width: 100vw;
+    height: 100vh;
+    background: black;
+  }
+  ruffle-player {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
 </style>
 </head>
 <body>
 
-<h1>💾 Offline SWF Player in New Tab</h1>
+<div id="upload-ui">
+  <h1>💾 Offline SWF Player</h1>
+  <div id="dropzone">📂 Drop a .swf file here or click to select</div>
+  <input type="file" id="file-input" accept=".swf" style="display:none" />
+  <br />
+  <button id="start-button" disabled>Start</button>
+</div>
 
-<div id="dropzone">📂 Drop a .swf file here or click to select</div>
-<input type="file" id="file-input" accept=".swf" style="display:none" />
-<br />
-<button id="start-button" disabled>Start (Open in New Tab)</button>
+<div id="player-container">
+  <ruffle-player id="player"></ruffle-player>
+</div>
 
+<script src="ruffle.js"></script>
 <script>
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("file-input");
   const startButton = document.getElementById("start-button");
+  const uploadUI = document.getElementById("upload-ui");
+  const playerContainer = document.getElementById("player-container");
+  const player = document.getElementById("player");
   let swfFile = null;
 
   function handleFile(file) {
@@ -93,64 +115,31 @@
     if (!swfFile) return;
 
     const reader = new FileReader();
-    reader.onload = function () {
-      // Convert ArrayBuffer to Base64
+    reader.onload = () => {
       const arrayBuffer = reader.result;
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let binary = "";
-      for (let i = 0; i < uint8Array.byteLength; i++) {
-        binary += String.fromCharCode(uint8Array[i]);
-      }
-      const base64data = btoa(binary);
+      player.load(arrayBuffer);
 
-      // Open new tab about:blank
-      const newTab = window.open("about:blank", "_blank");
+      // Hide upload UI, show player container fullscreen
+      uploadUI.style.display = "none";
+      playerContainer.style.display = "block";
 
-      // Inject HTML + Ruffle player + SWF
-      const html = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8" />
-          <title>SWF Player</title>
-          <style>
-            body {
-              margin: 0; background: black; display: flex; justify-content: center; align-items: center; height: 100vh;
-            }
-            ruffle-player {
-              width: 100vw; height: 100vh;
-            }
-          </style>
-        </head>
-        <body>
-          <ruffle-player id="player"></ruffle-player>
-          <script src="ruffle.js"></script>
-          <script>
-            window.addEventListener('load', () => {
-              const ruffle = window.RufflePlayer.newest();
-              const player = ruffle.createPlayer();
-              document.body.appendChild(player);
-              const base64data = "${base64data}";
-              const binaryString = atob(base64data);
-              const len = binaryString.length;
-              const bytes = new Uint8Array(len);
-              for (let i = 0; i < len; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-              }
-              player.load({ data: bytes.buffer });
-            });
-          </script>
-        </body>
-        </html>
-      `;
-
-      newTab.document.write(html);
-      newTab.document.close();
+      // Push state so back button works
+      history.pushState({ playing: true }, "Playing SWF");
 
       startButton.disabled = true;
     };
-
     reader.readAsArrayBuffer(swfFile);
+  });
+
+  // Handle back button to return to upload UI
+  window.addEventListener("popstate", (event) => {
+    if (!event.state || !event.state.playing) {
+      // Show upload UI, hide player
+      uploadUI.style.display = "block";
+      playerContainer.style.display = "none";
+      startButton.disabled = !swfFile; // re-enable start button if file loaded
+      player.unload();
+    }
   });
 </script>
 
