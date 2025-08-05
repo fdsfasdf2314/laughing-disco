@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Offline SWF Player</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #1a1a1a;
+      color: white;
+      margin: 0;
+      padding: 2em;
+    }
+    #dropzone {
+      border: 2px dashed #888;
+      padding: 40px;
+      margin: 20px auto;
+      width: 80%;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #2a2a2a;
+    }
+    ruffle-player {
+      width: 100%;
+      height: 600px;
+      display: block;
+      margin: 20px auto;
+    }
+    input[type="file"] {
+      margin-top: 1em;
+    }
+  </style>
+  <script src="ruffle.js"></script> <!-- Make sure ruffle.js and ruffle.wasm are next to this file -->
+</head>
+<body>
+
+  <h1>💾 Offline SWF Player with Save Support</h1>
+
+  <div id="dropzone">📂 Drop a .swf file here or click below</div>
+  <input type="file" id="file-input" accept=".swf">
+
+  <div id="player-container"></div>
+
+  <script>
+    const ruffle = window.RufflePlayer.newest();
+    const container = document.getElementById("player-container");
+
+    function loadSWF(file) {
+      if (!file.name.endsWith(".swf")) {
+        alert("Only .swf files are supported.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function () {
+        const player = ruffle.createPlayer();
+        container.innerHTML = ""; // Clear previous
+        container.appendChild(player);
+        player.load({ data: reader.result });
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // File input
+    document.getElementById("file-input").addEventListener("change", e => {
+      if (e.target.files.length > 0) {
+        loadSWF(e.target.files[0]);
+      }
+    });
+
+    // Drag and drop
+    const dropzone = document.getElementById("dropzone");
+    dropzone.addEventListener("dragover", e => {
+      e.preventDefault();
+      dropzone.style.borderColor = "#0f0";
+    });
+    dropzone.addEventListener("dragleave", () => {
+      dropzone.style.borderColor = "#888";
+    });
+    dropzone.addEventListener("drop", e => {
+      e.preventDefault();
+      dropzone.style.borderColor = "#888";
+      if (e.dataTransfer.files.length > 0) {
+        loadSWF(e.dataTransfer.files[0]);
+      }
+    });
+    dropzone.addEventListener("click", () => {
+      document.getElementById("file-input").click();
+    });
+  </script>
+
+</body>
+</html>
