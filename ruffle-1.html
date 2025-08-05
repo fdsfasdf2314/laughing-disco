@@ -1,147 +1,154 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Offline SWF Player</title>
-<style>
-  body, html {
-    margin: 0; padding: 0; height: 100%; background: #222; color: white; font-family: Arial, sans-serif;
-    overflow: hidden;
-  }
-  #upload-ui {
-    text-align: center;
-    padding: 40px;
-  }
-  #dropzone {
-    border: 3px dashed #666;
-    padding: 60px;
-    margin: 20px auto;
-    width: 90%;
-    max-width: 600px;
-    cursor: pointer;
-    font-size: 1.3em;
-    border-radius: 12px;
-    user-select: none;
-    transition: border-color 0.3s;
-  }
-  #dropzone.dragover {
-    border-color: #0f0;
-  }
-  button#start-button {
-    margin-top: 40px;
-    font-size: 2em;
-    padding: 15px 30px;
-    cursor: pointer;
-  }
-  button#start-button:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  #player-container {
-    display: none;
-    width: 100vw;
-    height: 100vh;
-    background: black;
-  }
-  ruffle-player {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ruffle Emulator Local</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+    }
+    #controls {
+      background: #222;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      user-select: none;
+      z-index: 10;
+    }
+    #ruffle-container {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    ruffle-embed {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
 </head>
 <body>
 
-<div id="upload-ui">
-  <h1>💾 Offline SWF Player</h1>
-  <div id="dropzone">📂 Drop a .swf file here or click to select</div>
-  <input type="file" id="file-input" accept=".swf" style="display:none" />
-  <br />
-  <button id="start-button" disabled>Start</button>
-</div>
+  <div id="controls">
+    <input type="file" id="filepicker" accept=".swf" />
+    <button id="clearStorage">Clear Saved Progress</button>
+    <span id="status"></span>
+  </div>
 
-<div id="player-container">
-  <ruffle-player id="player"></ruffle-player>
-</div>
+  <div id="ruffle-container"></div>
 
-<script src="ruffle.js"></script>
-<script>
-  const dropzone = document.getElementById("dropzone");
-  const fileInput = document.getElementById("file-input");
-  const startButton = document.getElementById("start-button");
-  const uploadUI = document.getElementById("upload-ui");
-  const playerContainer = document.getElementById("player-container");
-  const player = document.getElementById("player");
-  let swfFile = null;
+  <!-- Load local ruffle.js, put ruffle.js in same folder as this HTML -->
+  <script src="ruffle.js"></script>
+  <script>
+    const ruffleContainer = document.getElementById('ruffle-container');
+    const filepicker = document.getElementById('filepicker');
+    const status = document.getElementById('status');
+    const clearStorageBtn = document.getElementById('clearStorage');
 
-  function handleFile(file) {
-    if (!file.name.endsWith(".swf")) {
-      alert("Only .swf files are supported.");
-      return;
+    const ruffle = window.RufflePlayer.newest();
+    const rufflePlayer = ruffle.createPlayer();
+    ruffleContainer.appendChild(rufflePlayer);
+
+    // Storage keys
+    const SWF_STORAGE_KEY = "ruffle_swf_data";
+    const SO_STORAGE_PREFIX = "ruffle_sharedobject_";
+
+    // Save SWF binary data to localStorage (base64 encoded)
+    function saveSWF(data) {
+      const base64 = btoa(String.fromCharCode(...data));
+      localStorage.setItem(SWF_STORAGE_KEY, base64);
+      status.textContent = "SWF saved";
     }
-    swfFile = file;
-    startButton.disabled = false;
-  }
 
-  fileInput.addEventListener("change", e => {
-    if (e.target.files.length > 0) {
-      handleFile(e.target.files[0]);
+    // Load SWF from localStorage
+    function loadSavedSWF() {
+      const savedData = localStorage.getItem(SWF_STORAGE_KEY);
+      if (savedData) {
+        try {
+          const binary = Uint8Array.from(atob(savedData), c => c.charCodeAt(0));
+          rufflePlayer.load({ data: binary });
+          status.textContent = "Loaded saved SWF";
+          return true;
+        } catch (e) {
+          console.error("Error loading saved SWF:", e);
+          status.textContent = "Failed to load saved SWF";
+        }
+      }
+      return false;
     }
-  });
 
-  dropzone.addEventListener("dragover", e => {
-    e.preventDefault();
-    dropzone.classList.add("dragover");
-  });
-
-  dropzone.addEventListener("dragleave", () => {
-    dropzone.classList.remove("dragover");
-  });
-
-  dropzone.addEventListener("drop", e => {
-    e.preventDefault();
-    dropzone.classList.remove("dragover");
-    if (e.dataTransfer.files.length > 0) {
-      handleFile(e.dataTransfer.files[0]);
+    // Save SharedObject data for a given name
+    function saveSharedObject(name, data) {
+      const base64 = btoa(String.fromCharCode(...data));
+      localStorage.setItem(SO_STORAGE_PREFIX + name, base64);
+      status.textContent = `Saved SharedObject: ${name}`;
     }
-  });
 
-  dropzone.addEventListener("click", () => {
-    fileInput.click();
-  });
-
-  startButton.addEventListener("click", () => {
-    if (!swfFile) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const arrayBuffer = reader.result;
-      player.load(arrayBuffer);
-
-      // Hide upload UI, show player container fullscreen
-      uploadUI.style.display = "none";
-      playerContainer.style.display = "block";
-
-      // Push state so back button works
-      history.pushState({ playing: true }, "Playing SWF");
-
-      startButton.disabled = true;
-    };
-    reader.readAsArrayBuffer(swfFile);
-  });
-
-  // Handle back button to return to upload UI
-  window.addEventListener("popstate", (event) => {
-    if (!event.state || !event.state.playing) {
-      // Show upload UI, hide player
-      uploadUI.style.display = "block";
-      playerContainer.style.display = "none";
-      startButton.disabled = !swfFile; // re-enable start button if file loaded
-      player.unload();
+    // Load SharedObject data for a given name
+    function loadSharedObject(name) {
+      const base64 = localStorage.getItem(SO_STORAGE_PREFIX + name);
+      if (!base64) return null;
+      try {
+        const data = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+        status.textContent = `Loaded SharedObject: ${name}`;
+        return data;
+      } catch (e) {
+        console.error("Error loading SharedObject", e);
+        return null;
+      }
     }
-  });
-</script>
+
+    // Hook into Ruffle's shared object handling
+    rufflePlayer.addEventListener("sharedobjectload", event => {
+      const soName = event.detail.name;
+      const savedSO = loadSharedObject(soName);
+      if (savedSO) {
+        event.detail.override(savedSO);
+        status.textContent = `Injected saved SharedObject: ${soName}`;
+      }
+    });
+
+    rufflePlayer.addEventListener("sharedobjectsave", event => {
+      const soName = event.detail.name;
+      const soData = event.detail.data;
+      saveSharedObject(soName, soData);
+    });
+
+    // Handle file selection
+    filepicker.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function() {
+        const arrayBuffer = reader.result;
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        rufflePlayer.load({ data: uint8Array });
+        saveSWF(uint8Array);
+        status.textContent = `Loaded: ${file.name}`;
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    // Clear storage button clears SWF + all saved sharedobjects
+    clearStorageBtn.addEventListener('click', () => {
+      localStorage.removeItem(SWF_STORAGE_KEY);
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(SO_STORAGE_PREFIX)) localStorage.removeItem(key);
+      });
+      status.textContent = "All saved progress cleared. Reload page.";
+    });
+
+    // Try to load saved SWF on start
+    loadSavedSWF();
+  </script>
 
 </body>
 </html>
